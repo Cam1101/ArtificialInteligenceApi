@@ -1,0 +1,20 @@
+from flask import Flask, request, jsonify
+from recommender import recommend_categories
+
+app = Flask(__name__)
+
+@app.route('/recommend', methods=['POST'])
+def recommend():
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "No data provided"}), 400
+
+    purchase_history = data.get('purchase_history', [])
+    if not purchase_history:
+        return jsonify({"error": "Purchase history is empty"}), 400
+
+    recommended_categories = recommend_categories(purchase_history)
+    return jsonify({"recommended_categories": recommended_categories})
+
+if __name__ == '__main__':
+    app.run(debug=True)
