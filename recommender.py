@@ -29,6 +29,9 @@ def recommend_categories(purchase_history):
     global_history.extend(new_categories)
     save_global_history(global_history)
     
+    if len(global_history) < 2:
+        return list(set(new_categories))
+    
     df = pd.DataFrame(global_history, columns=['category'])
     
     # Preprocesamiento
@@ -36,18 +39,27 @@ def recommend_categories(purchase_history):
     df['category_encoded'] = le.fit_transform(df['category'])
     
     # Crear un DataFrame ficticio para ajustar el modelo
-    df['price'] = 0
-    df['quantity'] = 1
-    X = df[['price', 'quantity', 'category_encoded']]
+    df['dummy_price'] = 0
+    df['dummy_quantity'] = 1
+    X = df[['dummy_price', 'dummy_quantity', 'category_encoded']]
     
     # Modelado
     n_neighbors = min(3, len(X))  # Ajustar n_neighbors a no más del número de muestras disponibles
     model = NearestNeighbors(n_neighbors=n_neighbors)
     model.fit(X)
     
-    # Generar recomendaciones
-    distances, indices = model.kneighbors(X)
-    recommended_categories = df.iloc[indices.flatten()]['category'].unique().tolist()
+    # Generar recomendaciones para las nuevas categorías
+    new_categories_encoded = le.transform(new_categories)
+    new_data = pd.DataFrame({
+        'dummy_price': [0] * len(new_categories_encoded),
+        'dummy_quantity': [1] * len(new_categories_encoded),
+        'category_encoded': new_categories_encoded
+    })
+    
+    distances, indices = model.kneighbors(new_data)
+    
+    recommended_indices = indices.flatten()
+    recommended_categories = df.iloc[recommended_indices]['category'].unique().tolist()
     
     # Limitar el número de categorías recomendadas a 2
     recommended_categories = recommended_categories[:2]
@@ -56,7 +68,7 @@ def recommend_categories(purchase_history):
     category_totals = df['category'].value_counts()
     top_categories = category_totals.nlargest(2).index.tolist()
     
-    # Combinar las recomendaciones con las categorías más compradas
+    # Combinar las recomendaciones con las categorías más compradas, asegurando que sean únicas
     final_recommendations = list(set(recommended_categories + top_categories))[:2]
     
     return final_recommendations
